@@ -1,0 +1,2239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MegaETH Dual Block Production</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #141414;
+    --surface: #1a1a1a;
+    --card: #1e1e1e;
+    --border: #333;
+    --border-dashed: #3a3a3a;
+    --text: #e8e8e8;
+    --text-mid: #999;
+    --text-dim: #5a5a5a;
+    --accent: #f0a0a0;
+    --accent-hot: #e87676;
+    --accent-dim: rgba(240, 160, 160, 0.08);
+    --accent-border: rgba(240, 160, 160, 0.3);
+    --green: #4ade80;
+    --green-dim: rgba(74, 222, 128, 0.08);
+    --green-border: rgba(74, 222, 128, 0.3);
+    --confirmed-border: rgba(255,255,255,0.18);
+    --confirmed-bg: rgba(255,255,255,0.04);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, sans-serif;
+    min-height: 100vh;
+    padding: 36px 24px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---- HEADER ---- */
+  .page-header {
+    width: 100%;
+    max-width: 960px;
+    margin-bottom: 28px;
+  }
+
+  .page-header .live-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .page-header .live-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px rgba(74, 222, 128, 0.4);
+    animation: glow 1.5s ease-in-out infinite;
+  }
+
+  .page-header .live-dot.disconnected {
+    background: #ef4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+  }
+
+  @keyframes glow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .page-header h1 {
+    font-family: 'Inter', sans-serif;
+    font-size: 2.1rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+    color: var(--text);
+  }
+
+  .page-header .desc {
+    margin-top: 12px;
+    font-size: 0.88rem;
+    color: var(--text-mid);
+    line-height: 1.7;
+    max-width: 620px;
+    padding-top: 12px;
+  }
+
+  /* ---- STAT CARDS ---- */
+  .stat-cards {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    width: 100%;
+    max-width: 960px;
+    margin-bottom: 24px;
+  }
+
+  .stat-card {
+    border: 1px dashed var(--border-dashed);
+    background: var(--surface);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .stat-card .sc-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+  }
+
+  .stat-card .sc-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .stat-card.split { padding: 0; }
+
+  .stat-card.split .sc-label { padding: 10px 16px 0; }
+
+  .stat-card.split .split-row {
+    display: flex;
+    flex: 1;
+  }
+
+  .stat-card.split .split-half {
+    flex: 1;
+    padding: 6px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .stat-card.split .split-half:first-child {
+    border-right: 1px solid var(--border);
+  }
+
+  .stat-card.split .sh-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.48rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+  }
+
+  .stat-card.split .sh-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  /* ---- PAUSE NOTICE ---- */
+  .pause-bar {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--card);
+    border: 1px dashed var(--border-dashed);
+    padding: 6px 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--text-mid);
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+
+  .pause-bar.show { opacity: 1; }
+
+  /* ---- MAIN GRID ---- */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 12px 1fr;
+    width: 100%;
+    max-width: 960px;
+    gap: 0;
+    align-items: start;
+  }
+
+  .col {
+    border: 1px dashed var(--border-dashed);
+    background: var(--surface);
+  }
+
+  .col-top {
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .col-top .col-title {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--text);
+  }
+
+  .col-top .col-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--text-dim);
+  }
+
+  .col-top .col-tag .val { color: var(--text-mid); }
+
+  /* ---- BLOCK LIST ---- */
+  .block-area {
+    padding: 10px;
+    min-height: 480px;
+    max-height: 480px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-dashed) transparent;
+  }
+
+  .block-area::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .block-area::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .block-area::-webkit-scrollbar-thumb {
+    background: var(--border-dashed);
+    border-radius: 2px;
+  }
+
+  .block-area::-webkit-scrollbar-thumb:hover {
+    background: var(--text-dim);
+  }
+
+  /* ---- MINI BLOCK ---- */
+  .m-block {
+    border: 1px solid var(--border);
+    background: var(--card);
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+    /* GPU optimization hints */
+    will-change: transform;
+    contain: layout style;
+    /* Fast transition only for done state */
+    transition: border-color 0.08s ease, background 0.08s ease;
+  }
+
+  .m-block.done {
+    border-color: var(--confirmed-border);
+    background: var(--confirmed-bg);
+  }
+
+  .m-block-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2px 0 4px;
+    cursor: pointer;
+  }
+
+  .m-block .bid {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text-mid);
+    font-weight: 500;
+  }
+
+  .m-block .done-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    transition: color 0.15s;
+  }
+
+  .m-block.done .done-tag { color: var(--green); }
+
+  /* Mini block hover highlight */
+  .m-block:hover {
+    border-color: var(--accent) !important;
+    background: var(--accent-dim) !important;
+    box-shadow: 0 0 12px rgba(240, 160, 160, 0.1);
+    cursor: pointer;
+  }
+
+  .m-block .txs { display: flex; flex-wrap: wrap; gap: 4px; }
+
+  .m-block .empty-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58rem;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+
+  /* fadeUp animation removed - too expensive at 100 blocks/sec */
+
+  /* ---- TX ---- */
+  .tx {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-decoration: none;
+  }
+
+  .tx:hover {
+    background: rgba(255,255,255,0.07);
+    border-color: rgba(255,255,255,0.12);
+    color: var(--text-mid);
+  }
+
+  .tx .tx-hash { letter-spacing: 0.02em; }
+
+  .tx.confirmed-mini, .tx.confirmed-evm {
+    color: var(--text);
+    border-color: var(--confirmed-border);
+    background: var(--confirmed-bg);
+  }
+
+  .tx.highlighted {
+    color: var(--accent-hot) !important;
+    border-color: var(--accent) !important;
+    background: var(--accent-dim) !important;
+    box-shadow: 0 0 16px rgba(240, 160, 160, 0.12);
+    z-index: 10;
+  }
+
+  .tx.dimmed { opacity: 0.12; }
+
+  /* ---- TOOLTIP ---- */
+  .tooltip {
+    position: fixed;
+    background: #222;
+    border: 1px dashed var(--border-dashed);
+    padding: 10px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--text-mid);
+    z-index: 1000;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.12s;
+    min-width: 210px;
+    line-height: 1.7;
+  }
+
+  /* Tooltip becomes interactive when shown */
+  .tooltip.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .tooltip .tt-title {
+    color: var(--text);
+    font-weight: 600;
+    font-size: 0.65rem;
+    margin-bottom: 4px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tooltip .tt-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .tooltip .tt-label { color: var(--text-dim); }
+  .tooltip .tt-val { color: var(--text); }
+  .tooltip .tt-val.success { color: var(--green); }
+  .tooltip .tt-val.fail { color: var(--accent-hot); }
+
+  .tooltip .tt-hint {
+    margin-top: 6px;
+    padding-top: 4px;
+    border-top: 1px solid var(--border);
+    font-size: 0.5rem;
+    color: var(--text-dim);
+    text-align: center;
+  }
+
+  /* Clickable explorer link inside tooltip */
+  .tooltip .tt-hint a {
+    color: var(--accent);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .tooltip .tt-hint a:hover {
+    color: var(--accent-hot);
+    text-decoration: underline;
+  }
+
+  /* TX click flash animation */
+  .tx.flash-match {
+    animation: flashPink 0.6s ease;
+  }
+  @keyframes flashPink {
+    0%, 100% { box-shadow: none; }
+    30% { box-shadow: 0 0 20px rgba(240, 160, 160, 0.3); }
+  }
+
+  /* ---- EVM BLOCK ---- */
+  .e-block {
+    border: 1px dashed var(--border-dashed);
+    background: var(--card);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: all 0.3s;
+    margin-bottom: 6px;
+    min-height: 70px;
+    flex-shrink: 0;
+    overflow: visible;
+  }
+
+  .e-block.sealed {
+    border-style: solid;
+    border-color: var(--confirmed-border);
+    background: var(--confirmed-bg);
+  }
+
+  /* EVM block hover highlight */
+  .e-block:hover {
+    border-color: var(--accent) !important;
+    background: var(--accent-dim) !important;
+    box-shadow: 0 0 12px rgba(240, 160, 160, 0.1);
+    cursor: pointer;
+  }
+
+  .e-block-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    padding: 2px 0 4px;
+    cursor: pointer;
+  }
+
+  .e-block .bid {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text-mid);
+    font-weight: 500;
+  }
+
+  .e-block .e-status {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    flex-shrink: 0;
+  }
+
+  .e-block.building .e-status {
+    color: var(--text-dim);
+    border: 1px dashed var(--border-dashed);
+  }
+
+  .e-block.sealed .e-status {
+    color: var(--green);
+    border: 1px solid var(--green-border);
+    background: var(--green-dim);
+  }
+
+  .e-block .txs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  /* Expanded block - scrollable TX area */
+  .e-block.expanded .txs {
+    max-height: 280px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-dashed) transparent;
+  }
+
+  .e-block.expanded .txs::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .e-block.expanded .txs::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .e-block.expanded .txs::-webkit-scrollbar-thumb {
+    background: var(--border-dashed);
+    border-radius: 2px;
+  }
+
+  /* All TXs in expanded block are uniformly bright */
+  .e-block.expanded .tx {
+    color: var(--text) !important;
+    opacity: 1 !important;
+    border-color: var(--confirmed-border) !important;
+    background: var(--confirmed-bg) !important;
+  }
+
+  /* Pink highlight on hover inside expanded block */
+  .e-block.expanded .tx:hover {
+    color: var(--accent-hot) !important;
+    border-color: var(--accent) !important;
+    background: var(--accent-dim) !important;
+    box-shadow: 0 0 12px rgba(240, 160, 160, 0.15);
+  }
+
+  /* Pink highlight for clicked/matched TXs inside expanded block */
+  .e-block.expanded .tx.highlighted {
+    color: var(--accent-hot) !important;
+    border-color: var(--accent) !important;
+    background: var(--accent-dim) !important;
+    box-shadow: 0 0 12px rgba(240, 160, 160, 0.15);
+  }
+
+  /* Flash animation for matches inside expanded block */
+  .e-block.expanded .tx.flash-match {
+    animation: flashPink 0.6s ease !important;
+  }
+
+  /* When a block is expanded, dim all other blocks */
+  .block-area.has-expanded .e-block:not(.expanded) {
+    opacity: 0.15;
+    transition: opacity 0.2s;
+  }
+
+  .block-area.has-expanded .e-block.expanded {
+    opacity: 1;
+  }
+
+  /* +more badge - clickable, with z-index so block tooltip doesn't cover it */
+  .e-block .tx-overflow {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58rem;
+    font-weight: 500;
+    color: var(--text-mid);
+    background: rgba(255,255,255,0.04);
+    border: 1px dashed var(--border-dashed);
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    z-index: 5;
+  }
+  .e-block .tx-overflow:hover {
+    color: var(--accent);
+    border-color: var(--accent-border);
+    background: var(--accent-dim);
+  }
+
+  /* Collapse button */
+  .e-block .tx-collapse {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58rem;
+    font-weight: 500;
+    color: var(--text-mid);
+    background: rgba(255,255,255,0.04);
+    border: 1px dashed var(--border-dashed);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .e-block .tx-collapse:hover {
+    color: var(--accent);
+    border-color: var(--accent-border);
+    background: var(--accent-dim);
+  }
+
+  /* Expanded EVM block */
+  .e-block.expanded .txs {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .e-block .bar-wrap {
+    height: 2px;
+    background: rgba(255,255,255,0.04);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .e-block .bar-fill {
+    height: 100%;
+    width: 0%;
+    background: rgba(255,255,255,0.35);
+    transition: width 0.08s linear;
+  }
+
+  .e-block.sealed .bar-wrap { display: none; }
+
+  /* ---- MIDDLE ---- */
+  .mid { min-height: 100px; }
+
+  @media (max-width: 800px) {
+    .stat-cards { grid-template-columns: repeat(3, 1fr); }
+    .grid { grid-template-columns: 1fr; gap: 16px; }
+    .mid { display: none; }
+    .page-header h1 { font-size: 1.5rem; }
+    .block-area { min-height: 320px; max-height: 320px; }
+  }
+
+  @media (max-width: 500px) {
+    .stat-cards { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+  <div class="pause-bar" id="pauseBar">[ paused ] hover a transaction or block for details</div>
+  <div class="tooltip" id="tooltip"></div>
+
+  <div class="page-header">
+        <div class="live-tag">
+          <div class="live-dot" id="liveDot"></div>
+        </div>
+        <h1>MEGAETH DUAL BLOCK PRODUCTION</h1>
+        <p class="desc">
+          Mini blocks are produced in parallel with EVM blocks, processing the same transactions and providing the same inclusion guarantees. They operate with a 10ms block time, that's 100 mini blocks for every single EVM block.
+        </p>
+  </div>
+
+  <!-- STAT CARDS -->
+  <div class="stat-cards">
+    <div class="stat-card">
+      <span class="sc-label">Transaction Count (24h)</span>
+      <span class="sc-value" id="sTx">0</span>
+    </div>
+    <div class="stat-card">
+      <span class="sc-label">Transactions / sec</span>
+      <span class="sc-value" id="sTps">0</span>
+    </div>
+    <div class="stat-card">
+      <span class="sc-label">EVM Blocks</span>
+      <span class="sc-value" id="sEvm">0</span>
+    </div>
+    <div class="stat-card split">
+      <span class="sc-label">Block Time</span>
+      <div class="split-row">
+        <div class="split-half">
+          <span class="sh-label">Mini</span>
+          <span class="sh-val" id="miniTime">10.0ms</span>
+        </div>
+        <div class="split-half">
+          <span class="sh-label">EVM</span>
+          <span class="sh-val" id="evmTime">1.00s</span>
+        </div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <span class="sc-label">Gas Usage</span>
+      <span class="sc-value" id="sGas">0.0 MGAS/s</span>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="col mini">
+      <div class="col-top">
+        <span class="col-title">Mini Blocks</span>
+        <span class="col-tag">[ <span class="val">10ms</span> · 100/sec ]</span>
+      </div>
+      <div class="block-area" id="mArea"></div>
+    </div>
+
+    <div class="mid"></div>
+
+    <div class="col evm">
+      <div class="col-top">
+        <span class="col-title">EVM Blocks</span>
+        <span class="col-tag">[<span class="val" id="evmTime">1s</span> · 1/sec]</span>
+      </div>
+      <div class="block-area" id="eArea"></div>
+    </div>
+  </div>
+
+<script>
+  // ========== CONFIGURATION ==========
+  const WS_URL = 'wss://mainnet.megaeth.com/rpc';
+  const HTTP_RPC = 'https://mainnet.megaeth.com/rpc';
+  const EXPLORER = 'https://megaeth.blockscout.com/tx/';
+  const MAX_MINI = 500;
+  const MAX_EVM = 100;
+  const EVM_TX_CAP = 16;
+
+  // ========== CONTRACT NAME LABELS ==========
+  const CONTRACT_NAMES = {
+    // Lending
+    '0x2ea493384f42d7ea78564f3ef4c86986eab4a890': 'Avon',
+    // DeFi - Beefy Finance
+    '0x795fe6681b3b7d11a9fcf4cb92ad1fbe65b45182': 'Beefy',
+    '0xa745aef3e54f2fa45560a8fc8cee190479d8e7d4': 'Beefy',
+    '0xc845eac583558ef89315917bba7459e648030f0a': 'Beefy',
+    '0xcbadce0825ac9c9802e4d62c3a0cc29fbd7ec485': 'Beefy',
+    '0xd14c23ed38195c8c754e793849953df984dab529': 'Beefy',
+    '0xd76d0173b79e09002328f791774867935e1e61fe': 'Beefy',
+    '0xdcdb09546179e38e41e39e8a14fdcc1dec885722': 'Beefy',
+    // DeFi - Mania
+    '0xe2cedf3b96f8b5ffb0789ef93e02fa5479e7ba02': 'Mania',
+    '0xb2f6344cb0ee13e027759166770198f4d8b3106d': 'Mania',
+    // DeFi - Sir Trading
+    '0x4edf071a7dee52fbe663df7873994725ba91cdc7': 'Sir Trading',
+    '0x549618c8e4b74f9eb519e459698b2caf53da0453': 'Sir Trading',
+    '0x5f84c79389a4d44a38a3bf81f9b8c1179e615cc8': 'Sir Trading',
+    '0x686748764c5c7aa06fec784e60d14b650bf79129': 'Sir Trading',
+    '0x7c5c408367cc8e9aec11f568fc8e5ae5ade69c95': 'Sir Trading',
+    '0x8d694d1b369bde5b274ad643fedd74f836e88543': 'Sir Trading',
+    '0x9367a0c482703d8d9bda995b03f8e71056a72500': 'Sir Trading',
+    '0xf1db8f4d2543c2c881a3dc90754cedf549cd362d': 'Sir Trading',
+    // DeFi - WarpX
+    '0x2fcb75d7ddea4cea87e77aa69fb9d3c4cd93deb5': 'WarpX',
+    '0x38d6649313f31db18e11d0e1476e2121d27651c3': 'WarpX',
+    '0x850253bc4a295d64fb8ea4ed992bff3755681251': 'WarpX',
+    '0x922b2c6e22b6c30d5d7ed86c51e395351becf655': 'WarpX',
+    '0xb3ae00a68f09e8b8a003b7669e2e84544cc4a385': 'WarpX',
+    '0xc0c50e0445978d672ec1c785985ea70825bc9da8': 'WarpX',
+    '0xf67cf9d6fc433e97ec39ae4b7e4451b56b171c8a': 'WarpX',
+    '0xf7552beb9e6422887bd17e6b78d9c97f7ce1c4d7': 'WarpX',
+    // DEX - Canonic
+    '0xad7e5cbfb535cec8d2e58dca17b11d9ba76f555e': 'Canonic',
+    '0x26f35fcba3c1387dbac477d82bb8a66fa2edfb4e': 'Canonic',
+    '0x23469683e25b780dfdc11410a8e83c923cadf125': 'Canonic',
+    '0x11469caf743c2bfbd663c42a2e339a75e053075c': 'Canonic',
+    '0xdf1576c3c82c9f8b759c69f4cf256061c6fe1f9e': 'Canonic',
+    '0xc397f8ffd517eda78da4de59c53516b65846a82a': 'Canonic',
+    // DEX - Current X
+    '0x09cf8a0b9e8c89bff6d1acbe1467e8e335bdd03e': 'Current X',
+    '0x189b27c207b4cbbae1c65086f31383532443f5f2': 'Current X',
+    '0x1f49127e87a1b925694a67c437dd2252641b3875': 'Current X',
+    '0x2c61d16ad68f030bec95370ab8a0ba60e7e7b0a6': 'Current X',
+    '0x40276cff28774fafaf758992415cfa03b6e4689c': 'Current X',
+    '0x47163ef055ac5efdfdd946303f86820736bfbb8d': 'Current X',
+    '0x5a8bc70674d82ac2bc04be91cf172f60169c50b3': 'Current X',
+    '0x962e62df3df243844bd89ffb5b061919725dca2d': 'Current X',
+    '0xa02e90a5f5ef73c434f5a7e6a77e6508f009cb9d': 'Current X',
+    '0xaa5b9f20e788063cd1e7e482c9f55b8c803e5456': 'Current X',
+    '0xc60940f182f7699522970517f6d753a560546937': 'Current X',
+    '0xd8fe4a55f7f79d2937637671923e59d8488683c3': 'Current X',
+    '0xdeddfd6f6fd2eda3b0bc01c3dfa03f2ea6f40504': 'Current X',
+    // DEX - GMX
+    '0x041336a3daf0a12d004a95f1511393d9a3d7236d': 'GMX',
+    // DEX - Kumbaya
+    '0x050b6c26d3a8693b0cc36cd85da4c3c9e5454f56': 'Kumbaya',
+    '0x1f1a8dc7e138c34b503ca080962ac10b75384a27': 'Kumbaya',
+    '0x2b3a132630d02efe8136f1553026c41cc45e8536': 'Kumbaya',
+    '0x2b781c57e6358f64864ff8ec464a03fdaf9974ba': 'Kumbaya',
+    '0x366c29077423cf99f7bbe4508cf508778eab25fb': 'Kumbaya',
+    '0x545e7e003f795fa0daa2e4f38af16c91a524c892': 'Kumbaya',
+    '0x68b34591f662508076927803c567cc8006988a09': 'Kumbaya',
+    '0x9c22f028e0a1dc76eb895a1929dbc517c9d0593e': 'Kumbaya',
+    '0x9f393a399321110fb7d85acc812b8e48a7c569ac': 'Kumbaya',
+    '0xaab1c664cead881afbb58555e6a3a79523d3e4c0': 'Kumbaya',
+    '0xe2702742f78b84f2032c5a36082b199e2d62aab0': 'Kumbaya',
+    '0xe5bbef8de2db447a7432a47eba58924d94ee470e': 'Kumbaya',
+    '0xeeb4a1001354717598af33f3585b66f9de7e7b27': 'Kumbaya',
+    '0xf6f404ac6289ab8eb1caf244008b5f073d59385c': 'Kumbaya',
+    '0xfe62b6d18e046d95be9bd667f573ebc5bf1dbaa0': 'Kumbaya',
+    // DEX - Noxa Fun
+    '0x9d2ca6cb64edeeb1374bf99868f1b2e9bed1194b': 'Noxa Fun',
+    // DEX - Prism
+    '0x29fc9e2d29d0ae4a26aacfb2c2197ad5d2513f12': 'Prism',
+    '0xa60e3fff37ff66f0ccffda4c917cfea7c4d72157': 'Prism',
+    '0xd9bc0d14c5436fa86ae7e49d2cba4d176dae54cd': 'Prism',
+    // DEX - Sector One
+    '0x14ec12eec3e795d5290ab80dabdafec38bd2cd41': 'Sector One',
+    '0x1dd0095a169e8398448a8e72f15a12ca148397c1': 'Sector One',
+    '0xa88e5d00d39b97dda8a734a378bfa54fa231f74e': 'Sector One',
+    '0xfa52dd868d6b7bd37307450f260b3a685a6c37af': 'Sector One',
+    // Gaming
+    '0xa30a04b433999d1b20e528429ca31749c7a59098': 'Crossy Fluffle',
+    '0xf279bb598e92c161c2fe7f455d5c44f0c469b78e': 'Intraverse',
+    '0x03c7632ed8780bc1e6ccbaf9ec6a1b4f84225601': 'OKCPU',
+    '0x0e0f4dd25ae8ab20e1583d9e8edff319a88e1d3f': 'Showdown',
+    '0xf0a110098e1997964c5b1072516dd8e8d83c4e05': 'Showdown',
+    '0xf657eba546c939ded7ba9588634f0e818bc0bb5e': 'Smasher',
+    '0xf0a110098e1997964c5b1072516dd8e8d83c4e05': 'Stomp.gg',
+    '0xee1b72c418a156ddae78f00410f73789e44b7ea2': 'TopStrike',
+    // Launchpad
+    '0x000000e70b8c30d9f2be1bc96e13c266a5d0fd46': 'Faster',
+    // NFT
+    '0x42e8acba221e7770cfe9b9d8565d82eeaf0e64c5': 'MegaPunk',
+    '0xd803a4cf5fbae55c6f916850d9133defb43a270c': 'MegaPunk',
+    '0x000003adbdf29b18b8f025a1ccf5f41804dcc40c': 'Odds',
+    '0x1af2fd34b8ce310c0e9cd1653db889271c018681': 'Rarible',
+    // Infrastructure
+    '0x420000000000000000000000000000000000000f': 'Chainlink',
+    '0x1a44076050125825900e736c501f859c50fe728c': 'LayerZero',
+    '0x32bad2f8578c2c1e99d2af623e281302b4f02d0c': 'MTRKR',
+    '0x4200000000000000000000000000000000000015': 'MegaETH',
+    '0x41f4f7dd0a4c5b52b9eb5bcf86b3edebb93ad6bb': 'Redstone',
+    '0x420db73c50783c93cd05d34c8e83264802b5f45f': 'SkyscallSDK',
+    '0x420dcf66fc8d4c84f195f9b98c2f212be21ca43a': 'Warren',
+    '0x5f2c48a1e59da03e8e0e0a035eb691c0df73d028': 'WheelX',
+    '0xbebdb6c8ddd1b3d13791034e762716671c002f49': 'Wormhole'
+  };
+
+  // Helper function to label addresses with protocol names
+  function labelAddress(addr) {
+    if (!addr) return 'N/A';
+    const lower = addr.toLowerCase();
+    const name = CONTRACT_NAMES[lower];
+    if (name) {
+      return name + ' (' + addr.slice(0, 6) + '...' + addr.slice(-4) + ')';
+    }
+    return addr;
+  }
+
+  // Classify transaction by method signature (142 total methods)
+  function classifyAction(signature) {
+    if (!signature || signature.length < 10) return 'Other Contract Interaction';
+
+    // ERC-20 Token Operations
+    if (signature === '0xa9059cbb') return 'ERC-20 Transfer';
+    if (signature === '0x23b872dd') return 'ERC-20 Transfer';
+    if (signature === '0x095ea7b3') return 'Approve';
+    if (signature === '0xe8eda9df') return 'Deposit'; // Lending deposit
+
+    // NFT Operations
+    if (signature === '0x42842e0e') return 'NFT Transfer';
+    if (signature === '0xb88d4fde') return 'NFT Transfer';
+    if (signature === '0x40c10f19') return 'NFT Mint';
+    if (signature === '0x6a627842') return 'NFT Mint';
+    if (signature === '0xa22cb465') return 'Approve';
+
+    // Token Launch (Kumbaya)
+    if (signature === '0x01339c21') return 'Launch';
+    if (signature === '0x0fdc15ee') return 'Launch';
+
+    // DeFi - Swaps
+    if (signature === '0x38ed1739') return 'Swap';
+    if (signature === '0x7ff36ab5') return 'Swap';
+    if (signature === '0x18cbafe5') return 'Swap';
+    if (signature === '0x8803dbee') return 'Swap';
+    if (signature === '0x4a25d94a') return 'Swap';
+    if (signature === '0xfb3bdb41') return 'Swap';
+    if (signature === '0x5c11d795') return 'Swap';
+    if (signature === '0xb6f9de95') return 'Swap';
+    if (signature === '0x791ac947') return 'Swap';
+    if (signature === '0x04e45aaf') return 'Swap';
+    if (signature === '0xd3487997') return 'Swap'; // Kumbaya callback
+
+    // DeFi - Liquidity
+    if (signature === '0xe8e33700') return 'Add Liquidity';
+    if (signature === '0xf305d719') return 'Add Liquidity';
+    if (signature === '0x4515cef3') return 'Add Liquidity';
+    if (signature === '0xbaa2abde') return 'Remove Liquidity';
+    if (signature === '0x02751cec') return 'Remove Liquidity';
+    if (signature === '0xaf2979eb') return 'Remove Liquidity';
+
+    // DeFi - Staking & Yield
+    if (signature === '0xa694fc3a') return 'Stake';
+    if (signature === '0x2e17de78') return 'Unstake';
+    if (signature === '0xb6b55f25') return 'Deposit';
+    if (signature === '0xd0e30db0') return 'Deposit';
+    if (signature === '0x68a9674d') return 'Deposit'; // Kumbaya depositFrom
+    if (signature === '0x2e1a7d4d') return 'Withdraw';
+    if (signature === '0x3ccfd60b') return 'Withdraw';
+    if (signature === '0x00f714ce') return 'Withdraw';
+    if (signature === '0x4e71d92d') return 'Claim';
+    if (signature === '0x379607f5') return 'Claim';
+    if (signature === '0xe6f1daf2') return 'Claim';
+    if (signature === '0x4e71e0c8') return 'Claim';
+    if (signature === '0x15a0ea6a') return 'Claim'; // Kumbaya claimFees
+    if (signature === '0xf04b8dc7') return 'Claim'; // Intraverse cashOut
+    if (signature === '0x71c21c53') return 'Claim'; // Intraverse withdrawFunds
+    if (signature === '0x7bfe7a43') return 'Claim'; // Smasher cashOut
+    if (signature === '0x6e2d05a5') return 'Claim'; // Smasher claimRakeback
+    if (signature === '0x39cff220') return 'Claim'; // Smasher claimReferral
+
+    // DeFi - Lending
+    if (signature === '0xc5ebeaec') return 'Borrow';
+    if (signature === '0xa415bcad') return 'Borrow';
+    if (signature === '0x0e752702') return 'Repay';
+    if (signature === '0x573ade81') return 'Repay';
+
+    // Governance / Execution
+    if (signature === '0x15373e3d') return 'Vote';
+    if (signature === '0xda95691a') return 'Propose';
+    if (signature === '0xb61d27f6') return 'Execute';
+    if (signature === '0xfe0d94c1') return 'Execute';
+    if (signature === '0x3593564c') return 'Execute';
+    if (signature === '0xff6d8d05') return 'Execute'; // Kumbaya graduate
+    if (signature === '0x51dfdb48') return 'Execute'; // Kumbaya executeMigration
+    if (signature === '0x70480275') return 'Execute'; // Intraverse addAdmin
+    if (signature === '0x1785f53c') return 'Execute'; // Intraverse removeAdmin
+    if (signature === '0xf62d1888') return 'Execute'; // Intraverse initialize
+    if (signature === '0x02153e29') return 'Execute'; // Intraverse setGameCounter
+    if (signature === '0xf2fde38b') return 'Execute'; // Intraverse transferOwnership
+    if (signature === '0x715018a6') return 'Execute'; // Intraverse renounceOwnership
+    if (signature === '0xd2347937') return 'Execute'; // TopStrike awardEthPrize
+    if (signature === '0x91d4cda0') return 'Execute'; // TopStrike awardEthPrize (overload)
+    if (signature === '0x58c3e624') return 'Execute'; // TopStrike awardEthPrizeBatch
+    if (signature === '0xa284235a') return 'Execute'; // TopStrike awardSharePrizeByLots
+    if (signature === '0xc0116a02') return 'Execute'; // TopStrike recordEthPrizeAwarded
+    if (signature === '0x6f281cb9') return 'Execute'; // RecordKeeping commitMigration
+    if (signature === '0x08515a41') return 'Execute'; // RecordKeeping executeMigration
+    if (signature === '0x2cd7745a') return 'Execute'; // RecordKeeping revokeMigration
+
+    // Bridge
+    if (signature === '0x09fc8843') return 'Bridge';
+    if (signature === '0x8340f549') return 'Bridge';
+    if (signature === '0xe11013dd') return 'Bridge';
+
+    // Batch Operations
+    if (signature === '0xac9650d8') return 'Batch Transaction';
+    if (signature === '0x5ae401dc') return 'Batch Transaction';
+
+    // Burn
+    if (signature === '0x42966c68') return 'Burn';
+    if (signature === '0x9dc29fac') return 'Burn';
+    if (signature === '0xda21b60c') return 'Burn'; // Kumbaya executeBurn
+
+    // Infrastructure/Oracle
+    if (signature === '0x01caec13') return 'Infrastructure Call';
+    if (signature === '0x9aec351f') return 'Infrastructure Call';
+    if (signature === '0xb7a16251') return 'Infrastructure Call';
+    if (signature === '0x098999be') return 'Infrastructure Call';
+    if (signature === '0x3701143c') return 'Infrastructure Call';
+    if (signature === '0x54686b11') return 'Infrastructure Call';
+    if (signature === '0x9940a9f9') return 'Infrastructure Call';
+    if (signature === '0x5c5184c5') return 'Infrastructure Call';
+    if (signature === '0x5175cbc6') return 'Infrastructure Call';
+    if (signature === '0xbf9e8518') return 'Infrastructure Call';
+    if (signature === '0x2ed66730') return 'Infrastructure Call';
+    if (signature === '0x42afb013') return 'Infrastructure Call';
+
+    // Gaming - Custom game-specific interactions
+    if (signature === '0x1628d7b8') return 'Custom App Interaction'; // Crossy Fluffle
+    if (signature === '0xd803a4cf') return 'Custom App Interaction'; // MegaPunk
+    if (signature === '0x4d891b19') return 'Custom App Interaction'; // Smasher (old)
+    if (signature === '0x3893c500') return 'Custom App Interaction'; // Smasher createGame
+    if (signature === '0x0a959f20') return 'Custom App Interaction'; // Smasher markGameAsLost
+    if (signature === '0x03c068b8') return 'Custom App Interaction'; // Showdown
+    if (signature === '0xd0d65411') return 'Custom App Interaction'; // Showdown
+    if (signature === '0x47f0e29b') return 'Custom App Interaction'; // Showdown
+    if (signature === '0x1ccb6922') return 'Custom App Interaction'; // Showdown submitGameResult
+    if (signature === '0x08213997') return 'Custom App Interaction'; // Showdown/Intraverse createGame
+    if (signature === '0x3979c6a1') return 'Custom App Interaction'; // Intraverse markGameAsLost
+    if (signature === '0x0f052239') return 'Custom App Interaction'; // TopStrike
+    if (signature === '0x42dd8743') return 'Custom App Interaction'; // TopStrike
+
+    // Stomp.gg - Engine (14 methods)
+    if (signature === '0xf87f241c') return 'Custom App Interaction'; // addEffect
+    if (signature === '0x0dfa469d') return 'Custom App Interaction'; // dealDamage
+    if (signature === '0x0b8e7b60') return 'Custom App Interaction'; // editEffect
+    if (signature === '0xe70dc6b0') return 'Custom App Interaction'; // emitEngineEvent
+    if (signature === '0x7015913c') return 'Custom App Interaction'; // end
+    if (signature === '0xe751f271') return 'Custom App Interaction'; // execute
+    if (signature === '0x57f7bb58') return 'Custom App Interaction'; // removeEffect
+    if (signature === '0x169a1da0') return 'Custom App Interaction'; // setGlobalKV
+    if (signature === '0xaa848221') return 'Custom App Interaction'; // setMove
+    if (signature === '0xfa4b4791') return 'Custom App Interaction'; // setUpstreamCaller
+    if (signature === '0x24939aa9') return 'Custom App Interaction'; // startBattle
+    if (signature === '0x43049e2b') return 'Custom App Interaction'; // switchActiveMon
+    if (signature === '0x24fa09d7') return 'Custom App Interaction'; // updateMatchmakers
+    if (signature === '0x72f37ee9') return 'Custom App Interaction'; // updateMonState
+
+    // Stomp.gg - Move Manager (2 methods)
+    if (signature === '0xaf2768ec') return 'Custom App Interaction'; // commitMove
+    if (signature === '0xe22cc5af') return 'Custom App Interaction'; // revealMove
+
+    // TopStrike - Trading (11 methods)
+    if (signature === '0x648966fe') return 'Custom App Interaction'; // buySharesByLots
+    if (signature === '0x32ca205f') return 'Custom App Interaction'; // buySharesByUnits
+    if (signature === '0xb2c7173a') return 'Custom App Interaction'; // sellSharesByLots
+    if (signature === '0x46cc6ed4') return 'Custom App Interaction'; // sellSharesByUnits
+    if (signature === '0xe57692a8') return 'Custom App Interaction'; // sellFractionalRemainder
+    if (signature === '0x1913be37') return 'Custom App Interaction'; // addPlayerAndSnipeByLots
+    if (signature === '0xd51e4956') return 'Custom App Interaction'; // addPlayerAndSnipeByUnits
+    if (signature === '0xb1ae4bc8') return 'Custom App Interaction'; // transferSharesByLots
+    if (signature === '0x12bbcf44') return 'Custom App Interaction'; // transferSharesByUnits
+    if (signature === '0x771c6524') return 'Custom App Interaction'; // transferAllSharesInWallet
+    if (signature === '0x1fa5fa3d') return 'Custom App Interaction'; // transferAllSharesOfIndividualPlayer
+
+    // RecordKeeping - Tournament system (9 methods)
+    if (signature === '0x6456901e') return 'Custom App Interaction'; // cancelPendingBattle
+    if (signature === '0xe6454753') return 'Custom App Interaction'; // commitMove
+    if (signature === '0xda15ce4b') return 'Custom App Interaction'; // commitRevealMove
+    if (signature === '0x746ea7bd') return 'Custom App Interaction'; // createTournament
+    if (signature === '0x1ba619a4') return 'Custom App Interaction'; // finalizeTournament
+    if (signature === '0x747ef3f3') return 'Custom App Interaction'; // recordBattle
+    if (signature === '0x334f7deb') return 'Custom App Interaction'; // registerForTournament
+    if (signature === '0xc44606ee') return 'Custom App Interaction'; // withdrawRegistration
+    if (signature === '0xa2443da0') return 'Custom App Interaction'; // seedRound
+
+    // Other gaming
+    if (signature === '0xb4f8f597') return 'Custom App Interaction'; // OKCPU
+    if (signature === '0x4b67c627') return 'Custom App Interaction'; // Intraverse
+
+    return 'Other Contract Interaction';
+  }
+
+  // ========== STATE ==========
+  let ws = null;
+  let txC = 0, mC = 0, eC = 0;
+  let paused = false;
+  let curEvm = null;
+  let evmBlocks = [];
+  let eProg = 0;
+  let txReg = {};
+  let totalGas = 0;
+  let tpsWindow = [];
+  let gasWindow = [];
+  let lastEvmBlock = 0;
+  let currentEvmBlockNumber = 0;
+  let evmBlockCount = 0;
+  let miniBlockTimes = [];
+  let evmBlockTimes = [];
+  let lastEvmTime = null;
+  let lastMiniTimestamp = null; // Track for mini block time deltas (microseconds)
+  let lastEvmTimestamp = null; // Track for EVM block time deltas (seconds)
+  let historicalTxCount = 0;
+  let isLoadingHistory = true;
+  let lastHistoricalBlock = 0;
+
+  // Performance: Track highlighted elements for fast cleanup (no querySelectorAll)
+  let currentHighlighted = [];
+  let currentDimmed = [];
+
+  const mArea = document.getElementById('mArea');
+  const eArea = document.getElementById('eArea');
+  const pauseBar = document.getElementById('pauseBar');
+  const tooltip = document.getElementById('tooltip');
+  const liveDot = document.getElementById('liveDot');
+
+  let mScrolledAway = false;
+  let eScrolledAway = false;
+  let mScrollAccumulated = 0; // Accumulated scroll adjustment for batching
+  let eScrollAccumulated = 0;
+
+  mArea.addEventListener('scroll', () => {
+    mScrolledAway = mArea.scrollTop > 20;
+  });
+  eArea.addEventListener('scroll', () => {
+    eScrolledAway = eArea.scrollTop > 20;
+  });
+
+  // ========== EVENT DELEGATION FOR TX ELEMENTS ==========
+  // Replaces 48,000+ individual TX event listeners with 6 delegated handlers
+  let lastHoveredTxId = null;
+
+  function handleTxMouseOver(e) {
+    const txEl = e.target.closest('.tx');
+    if (!txEl) return;
+    const id = txEl.dataset.txId;
+    if (id === lastHoveredTxId) return;
+    lastHoveredTxId = id;
+    onTxHover(id, e);
+  }
+
+  function handleTxMouseOut(e) {
+    const txEl = e.target.closest('.tx');
+    if (!txEl) return;
+    const related = e.relatedTarget;
+    if (related && related.closest && related.closest('.tx')) return;
+    lastHoveredTxId = null;
+    offHover();
+  }
+
+  function handleTxClick(e) {
+    const txEl = e.target.closest('.tx');
+    if (!txEl) return;
+    e.stopPropagation();
+    onTxClick(txEl.dataset.txId, txEl.dataset.side);
+  }
+
+  mArea.addEventListener('mouseover', handleTxMouseOver);
+  mArea.addEventListener('mouseout', handleTxMouseOut);
+  mArea.addEventListener('click', handleTxClick);
+  eArea.addEventListener('mouseover', handleTxMouseOver);
+  eArea.addEventListener('mouseout', handleTxMouseOut);
+  eArea.addEventListener('click', handleTxClick);
+
+  // keepScrollPosition removed - replaced with batched scroll adjustment using fixed estimates
+  // to eliminate layout thrashing from reading scrollHeight 100x/sec
+
+  // ========== FETCH INITIAL EVM BLOCK NUMBER ==========
+  async function fetchCurrentEvmBlock() {
+    try {
+      const response = await fetch(HTTP_RPC, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'eth_blockNumber',
+          params: [],
+          id: 1
+        })
+      });
+
+      const data = await response.json();
+      const blockNumber = parseInt(data.result, 16);
+      currentEvmBlockNumber = blockNumber;
+      evmBlockCount = blockNumber; // Initialize count to current block number
+      document.getElementById('sEvm').textContent = evmBlockCount.toLocaleString();
+      console.log('[MegaETH] ✅ Current EVM block:', blockNumber.toLocaleString());
+    } catch (error) {
+      console.error('[MegaETH] ❌ Error fetching EVM block number:', error);
+    }
+  }
+
+  // ========== CALCULATE 24H ROLLING WINDOW ==========
+  // Helper function to count transactions in a block range
+  async function countTransactionsInRange(startBlock, endBlock) {
+    let totalTxs = 0;
+    const batchSize = 100;
+
+    for (let i = startBlock; i <= endBlock; i += batchSize) {
+      const batchRequests = [];
+      const end = Math.min(i + batchSize - 1, endBlock);
+
+      for (let blockNum = i; blockNum <= end; blockNum++) {
+        batchRequests.push({
+          jsonrpc: '2.0',
+          method: 'eth_getBlockByNumber',
+          params: ['0x' + blockNum.toString(16), false],
+          id: blockNum
+        });
+      }
+
+      const batchResponse = await fetch(HTTP_RPC, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(batchRequests)
+      });
+
+      const batchData = await batchResponse.json();
+
+      for (const blockData of batchData) {
+        if (blockData.result && blockData.result.transactions) {
+          totalTxs += blockData.result.transactions.length;
+        }
+      }
+    }
+
+    return totalTxs;
+  }
+
+  // Track the last counted block for rolling window
+  let lastCountedBlock = null;
+  let currentTxCount = 0;
+
+  // Fetch 24h transaction count from Blockscout
+  const BLOCKSCOUT_API = 'https://megaeth.blockscout.com/api/v2/stats';
+
+  async function fetch24hTxCount() {
+    try {
+      const res = await fetch(BLOCKSCOUT_API);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data = await res.json();
+      const count = parseInt(data.transactions_today);
+
+      if (count && !isNaN(count)) {
+        txC = count;
+        document.getElementById('sTx').textContent = count.toLocaleString();
+
+        // Save to localStorage
+        localStorage.setItem('megaeth_24h_count', JSON.stringify({
+          count: count,
+          timestamp: Date.now(),
+          source: 'blockscout'
+        }));
+
+        console.log('[Blockscout] ✅ 24h TX count:', count.toLocaleString());
+      }
+    } catch (err) {
+      console.warn('[Blockscout] Failed to fetch 24h TX count:', err.message);
+      // Fall back to cached value if available
+      const cached = localStorage.getItem('megaeth_24h_count');
+      if (cached) {
+        try {
+          const data = JSON.parse(cached);
+          txC = data.count;
+          document.getElementById('sTx').textContent = data.count.toLocaleString();
+          console.log('[Blockscout] Using cached value:', data.count.toLocaleString());
+        } catch (e) {}
+      }
+    }
+  }
+
+  // Fetch on load and every 60 seconds
+  fetch24hTxCount();
+  setInterval(fetch24hTxCount, 60000);
+
+  // ========== LOAD INITIAL COUNT FROM CACHE ==========
+  function fetchHistoricalTxCount() {
+    isLoadingHistory = false;
+
+    // Try to load from localStorage first (for instant display)
+    const cached = localStorage.getItem('megaeth_24h_count');
+
+    if (cached) {
+      try {
+        const data = JSON.parse(cached);
+        const age = Date.now() - data.timestamp;
+        const ageMinutes = age / (1000 * 60);
+
+        // Use cached data if less than 5 minutes old
+        if (ageMinutes < 5) {
+          txC = data.count;
+          document.getElementById('sTx').textContent = data.count.toLocaleString();
+          console.log('[MegaETH] 💾 Using cached count:', data.count.toLocaleString(),
+                     '(age:', ageMinutes.toFixed(1), 'minutes)');
+        }
+      } catch (e) {
+        console.log('[MegaETH] ⚠️  Failed to parse localStorage');
+      }
+    }
+
+    // Fetch fresh data from Blockscout (will update display when ready)
+    console.log('[MegaETH] 📊 Fetching 24h count from Blockscout...');
+  }
+
+  // ========== WEBSOCKET CONNECTION ==========
+  function connectWebSocket() {
+    console.log('[MegaETH] Connecting to WebSocket:', WS_URL);
+    liveDot.classList.add('disconnected');
+
+    ws = new WebSocket(WS_URL);
+
+    ws.onopen = () => {
+      console.log('[MegaETH] WebSocket connected');
+      liveDot.classList.remove('disconnected');
+
+      // Fetch current EVM block number
+      fetchCurrentEvmBlock();
+
+      // Fetch historical transaction count
+      fetchHistoricalTxCount();
+
+      // Subscribe to miniBlocks
+      ws.send(JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'eth_subscribe',
+        params: ['miniBlocks'],
+        id: 1
+      }));
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        handleMessage(message);
+      } catch (e) {
+        console.error('[MegaETH] Parse error:', e);
+      }
+    };
+
+    ws.onclose = () => {
+      console.log('[MegaETH] WebSocket closed, reconnecting...');
+      liveDot.classList.add('disconnected');
+      setTimeout(connectWebSocket, 3000);
+    };
+
+    ws.onerror = (error) => {
+      console.error('[MegaETH] WebSocket error:', error);
+    };
+  }
+
+  function handleMessage(message) {
+    // Subscription confirmation
+    if (message.id === 1 && message.result) {
+      console.log('[MegaETH] Subscribed with ID:', message.result);
+      return;
+    }
+
+    // Mini block data
+    if (message.method === 'eth_subscription' && message.params) {
+      const miniBlock = message.params.result;
+      processMiniBlock(miniBlock);
+    }
+  }
+
+  // ========== PROCESS MINI BLOCK ==========
+  let lastMiniTime = null;
+
+  function processMiniBlock(miniBlock) {
+    if (paused) return;
+
+    // Debug: Log sample mini block every 100 blocks to see structure
+    if (mC % 100 === 0) {
+      console.log('[MegaETH] Mini block fields:', Object.keys(miniBlock).join(', '));
+      console.log('[MegaETH] Sample mini block:', JSON.stringify({
+        block_number: miniBlock.block_number,
+        index: miniBlock.index,
+        mini_block_timestamp: miniBlock.mini_block_timestamp,
+        block_timestamp: miniBlock.block_timestamp,
+        gas_used: miniBlock.gas_used,
+        tx_count: miniBlock.transactions?.length || 0
+      }, null, 2));
+    }
+
+    // Use mini_block_timestamp (in microseconds) for accurate timing
+    let miniBlockTimeMs = null;
+    if (miniBlock.mini_block_timestamp) {
+      // Convert hex microseconds to milliseconds
+      const microSeconds = parseInt(miniBlock.mini_block_timestamp, 16);
+      miniBlockTimeMs = microSeconds / 1000;
+    }
+
+    // Calculate time since last mini block
+    let timeSinceLast = null;
+    if (miniBlockTimeMs && lastMiniTime) {
+      timeSinceLast = miniBlockTimeMs - lastMiniTime;
+    }
+
+    if (miniBlockTimeMs) {
+      lastMiniTime = miniBlockTimeMs;
+    }
+
+    // Debug: Log timestamp details (sample 5% to see what's happening)
+    if (Math.random() < 0.05) {
+      const avgTime = miniBlockTimes.length > 0 ? (miniBlockTimes.reduce((a,b)=>a+b,0)/miniBlockTimes.length).toFixed(3) : 'N/A';
+      console.log(`[Mini Block Time] #${miniBlock.block_number}-${miniBlock.index} | ` +
+        `Has timestamp: ${!!miniBlock.mini_block_timestamp} | ` +
+        `Time since last: ${timeSinceLast ? timeSinceLast.toFixed(3) + 'ms' : 'N/A'} | ` +
+        `Avg: ${avgTime}ms`);
+    }
+
+    // Track mini block timing (display updated every 200ms by updateBlockTimes)
+    if (timeSinceLast !== null && timeSinceLast > 0 && timeSinceLast < 1000) {
+      miniBlockTimes.push(timeSinceLast);
+      if (miniBlockTimes.length > 100) miniBlockTimes.shift();
+
+      // Debug: Log when we successfully add a timing
+      if (miniBlockTimes.length <= 5) {
+        console.log(`[Timing] Added mini block time: ${timeSinceLast.toFixed(3)}ms (array size: ${miniBlockTimes.length})`);
+      }
+    } else if (miniBlockTimes.length === 0) {
+      // First block, initialize with expected 10ms
+      miniBlockTimes.push(10);
+      console.log('[Timing] Initialized mini block times with default 10ms');
+    } else if (timeSinceLast !== null) {
+      console.log(`[Timing] Rejected outlier: ${timeSinceLast.toFixed(3)}ms (must be 0-1000ms)`);
+    }
+
+    mC++;
+    // Convert hex strings to decimal numbers
+    const evmBlockNum = typeof miniBlock.block_number === 'string' ? parseInt(miniBlock.block_number, 16) : miniBlock.block_number;
+    const miniBlockIndex = typeof miniBlock.index === 'string' ? parseInt(miniBlock.index, 16) : miniBlock.index;
+    const miniBlockNumber = typeof miniBlock.mini_block_number === 'string' ? parseInt(miniBlock.mini_block_number, 16) : miniBlock.mini_block_number;
+    const miniNum = (evmBlockNum * 100) + miniBlockIndex; // Unique ID for tracking
+    const txs = miniBlock.transactions || [];
+    const txCount = txs.length;
+
+    // Parse gas used (hex string to number)
+    const gasUsed = typeof miniBlock.gas_used === 'string' ? parseInt(miniBlock.gas_used, 16) : (miniBlock.gas_used || 0);
+
+    // Calculate actual mini block time from timestamps
+    const miniTs = miniBlock.mini_block_timestamp ? parseInt(miniBlock.mini_block_timestamp, 16) : null;
+    let blockTimeMs = 10; // default fallback
+    let timeStr = '10ms';
+
+    if (miniTs !== null && lastMiniTimestamp !== null) {
+      const deltaUs = miniTs - lastMiniTimestamp; // microseconds
+      blockTimeMs = deltaUs / 1000; // microseconds → milliseconds
+
+      // Filter outliers (negative or >10 seconds)
+      if (blockTimeMs < 0 || blockTimeMs > 10000) {
+        timeStr = '—';
+      } else if (blockTimeMs < 1) {
+        timeStr = (deltaUs / 1000).toFixed(1) + 'µs'; // sub-millisecond
+      } else if (blockTimeMs < 1000) {
+        timeStr = Math.round(blockTimeMs) + 'ms';
+      } else {
+        timeStr = (blockTimeMs / 1000).toFixed(1) + 's';
+      }
+    }
+
+    if (miniTs !== null) {
+      lastMiniTimestamp = miniTs;
+    }
+
+    // Debug: Log mini block transaction count (sample 10%)
+    if (Math.random() < 0.1) {
+      console.log(`[Mini Block EVM #${evmBlockNum} · Mini #${miniBlockIndex}] ${txCount} TXs | Gas: ${gasUsed.toLocaleString()} | Time: ${timeStr}`);
+    }
+
+    // Track gas for rate calculation (already parsed above)
+    totalGas += gasUsed;
+    gasWindow.push({ timestamp: Date.now(), gas: gasUsed });
+
+    // Create mini block UI
+    const blk = document.createElement('div');
+    blk.className = 'm-block';
+
+    const top = document.createElement('div');
+    top.className = 'm-block-top';
+
+    const bid = document.createElement('span');
+    bid.className = 'bid';
+    bid.textContent = `#${miniBlockIndex}`;
+    top.appendChild(bid);
+
+    const dt = document.createElement('span');
+    dt.className = 'done-tag';
+    dt.textContent = '[ building... ]';
+    top.appendChild(dt);
+
+    blk.appendChild(top);
+
+    const txsDiv = document.createElement('div');
+    txsDiv.className = 'txs';
+
+    const ids = [];
+    const receipts = miniBlock.receipts || [];
+
+    if (txCount === 0) {
+      // Empty mini block
+      const emptyText = document.createElement('span');
+      emptyText.className = 'empty-text';
+      emptyText.textContent = '[ empty block ]';
+      txsDiv.appendChild(emptyText);
+    } else {
+      // Add transactions
+      for (let i = 0; i < Math.min(txCount, 20); i++) {
+        const tx = txs[i];
+        const receipt = receipts[i];
+        const txHash = tx.hash || tx;
+        const shortHash = typeof txHash === 'string' ? txHash.slice(0, 6) + '...' + txHash.slice(-4) : '0x???';
+        const fullHash = typeof txHash === 'string' ? txHash : '0x0000000000000000000000000000000000000000000000000000000000000000';
+
+        // Extract metadata
+        const methodSig = tx.input && tx.input.length >= 10 ? tx.input.slice(0, 10) : null;
+        const actionType = classifyAction(methodSig);
+
+        // Debug: Log method signatures and classifications (sample 5%)
+        if (Math.random() < 0.05) {
+          console.log('[TX Classification]', {
+            methodSig: methodSig,
+            type: actionType,
+            to: tx.to ? tx.to.slice(0, 10) + '...' : 'null',
+            inputLength: tx.input ? tx.input.length : 0
+          });
+        }
+
+        const txGasUsed = receipt && receipt.gasUsed ? parseInt(receipt.gasUsed, 16) : 0;
+        const meta = {
+          from: tx.from || 'N/A',
+          to: tx.to || 'Contract Creation',
+          type: actionType,
+          gas: txGasUsed > 0 ? txGasUsed.toLocaleString() : 'N/A',
+          gasRaw: txGasUsed, // Store raw number for calculations
+          status: receipt ? (parseInt(receipt.status, 16) === 1 ? 'success' : 'failed') : 'pending'
+        };
+
+        const txId = `${evmBlockNum}-${miniBlockIndex}-${i}`;
+        txReg[txId] = {
+          hash: shortHash,
+          fullHash: fullHash,
+          mEl: null,
+          eEl: null,
+          miniBlock: miniNum,
+          evmBlock: evmBlockNum,
+          meta: meta
+        };
+
+        const el = mkTx(txId, shortHash, 'mini');
+        txReg[txId].mEl = el;
+        txsDiv.insertBefore(el, txsDiv.firstChild); // Newest first
+        ids.push(txId);
+        tpsWindow.push(Date.now());
+      }
+
+      if (txCount > 20) {
+        const moreText = document.createElement('span');
+        moreText.className = 'empty-text';
+        moreText.textContent = `+${txCount - 20} more`;
+        txsDiv.appendChild(moreText);
+      }
+    }
+
+    blk.appendChild(txsDiv);
+
+    // Add mini block hover listeners (exclude TX elements)
+    const miniBlockData = {
+      num: `Mini Block #${miniBlockIndex}`,
+      success: receipts.filter(r => r && parseInt(r.status, 16) === 1).length,
+      failed: receipts.filter(r => r && parseInt(r.status, 16) === 0).length,
+      gas: (gasUsed / 1000000).toFixed(2) + 'M',
+      timestamp: new Date(), // TODO: Use actual block timestamp
+      txCount: txCount
+    };
+
+    blk.addEventListener('mouseover', (e) => {
+      if (!e.target.closest('.tx')) {
+        console.log('[Mini Block Hover] Mini #' + miniBlockIndex, 'success:', miniBlockData.success, 'failed:', miniBlockData.failed);
+        onBlockHover({
+          num: miniBlockData.num,
+          success: miniBlockData.success,
+          failed: miniBlockData.failed,
+          gas: miniBlockData.gas,
+          timestamp: miniBlockData.timestamp
+        }, e);
+      }
+    });
+    blk.addEventListener('mousemove', (e) => {
+      if (!e.target.closest('.tx')) {
+        moveTooltip(e);
+      }
+    });
+    blk.addEventListener('mouseleave', () => hideTooltip());
+
+    // Prepend block WITHOUT reading layout properties
+    mArea.prepend(blk);
+
+    // Accumulate scroll adjustment using fixed estimate (batched to reduce layout thrashing)
+    if (mScrolledAway) {
+      mScrollAccumulated += 50; // Fixed estimate: ~50px per mini block (no offsetHeight read!)
+
+      // Apply accumulated scroll every 5 blocks to batch layout operations
+      if (mC % 5 === 0) {
+        mArea.scrollTop += mScrollAccumulated;
+        mScrollAccumulated = 0;
+      }
+    }
+
+    // Performance: Confirm immediately (no setTimeout to reduce GC pressure at 100 blocks/sec)
+    blk.classList.add('done');
+    dt.textContent = `[ confirmed · ${timeStr} ]`;
+    ids.forEach(id => {
+      if (txReg[id] && txReg[id].mEl) txReg[id].mEl.classList.add('confirmed-mini');
+    });
+
+    // Add to current EVM block with overflow cap (newest first)
+    if (curEvm) {
+      ids.forEach(id => {
+        const tx = txReg[id];
+        curEvm.ids.push(id);
+        curEvm.success += tx.meta && tx.meta.status === 'success' ? 1 : 0;
+        curEvm.failed += tx.meta && tx.meta.status !== 'success' ? 1 : 0;
+        curEvm.totalGas += tx.meta && tx.meta.gasRaw ? tx.meta.gasRaw : 0;
+        curEvm.totalTxCount++;
+
+        const el = mkTx(id, tx.hash, 'evm');
+        tx.eEl = el;
+
+        if (curEvm.expanded) {
+          curEvm.txs.insertBefore(el, curEvm.txs.firstChild);
+        } else {
+          curEvm.txs.insertBefore(el, curEvm.txs.firstChild);
+          curEvm.visibleTxCount++;
+
+          if (curEvm.visibleTxCount > EVM_TX_CAP) {
+            // Performance: Use getElementsByClassName instead of querySelectorAll
+            const allPills = curEvm.txs.getElementsByClassName('tx');
+            const oldest = allPills[allPills.length - 1];
+            if (oldest) {
+              const oldId = oldest.dataset.txId;
+              // DON'T set eEl to null - keep the reference so txReg entry isn't deleted
+              // The element is removed from DOM but txReg keeps it for later expansion
+              curEvm.hiddenIds.push(oldId);
+              console.log(`[Hidden Push] ID: ${oldId}, hash: ${txReg[oldId]?.hash}, hiddenIds length: ${curEvm.hiddenIds.length}`);
+              curEvm.txs.removeChild(oldest);
+              curEvm.visibleTxCount--;
+            }
+
+            const overflow = curEvm.totalTxCount - EVM_TX_CAP;
+            if (!curEvm.overflowEl) {
+              const ov = document.createElement('span');
+              ov.className = 'tx-overflow';
+              ov.textContent = '+' + overflow + ' more';
+              const blockRef = curEvm;
+              ov.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                expandEvmBlock(blockRef);
+              });
+              // INSERT INTO eb.el, NOT eb.txs
+              const barWrap = curEvm.el.querySelector('.bar-wrap');
+              if (barWrap) {
+                curEvm.el.insertBefore(ov, barWrap);
+              } else {
+                curEvm.el.appendChild(ov);
+              }
+              curEvm.overflowEl = ov;
+            } else {
+              curEvm.overflowEl.textContent = '+' + overflow + ' more';
+            }
+          }
+        }
+      });
+    }
+
+    // Track EVM block change
+    if (evmBlockNum > lastEvmBlock) {
+      // Calculate actual EVM block time from timestamps
+      const evmTs = miniBlock.block_timestamp ? parseInt(miniBlock.block_timestamp, 16) : null;
+      let evmBlockTimeSec = 1; // default fallback
+      let evmTimeStr = '1s';
+
+      if (evmTs !== null && lastEvmTimestamp !== null) {
+        evmBlockTimeSec = evmTs - lastEvmTimestamp; // seconds
+
+        // Filter outliers (negative or >60 seconds)
+        if (evmBlockTimeSec < 0 || evmBlockTimeSec > 60) {
+          evmTimeStr = '—';
+        } else if (evmBlockTimeSec < 1) {
+          evmTimeStr = Math.round(evmBlockTimeSec * 1000) + 'ms';
+        } else {
+          evmTimeStr = evmBlockTimeSec + 's';
+        }
+      }
+
+      if (evmTs !== null) {
+        lastEvmTimestamp = evmTs;
+      }
+
+      console.log(`[EVM Block #${evmBlockNum}] Time since last: ${evmTimeStr}`);
+
+      lastEvmBlock = evmBlockNum;
+      addEvm(evmBlockNum, evmTimeStr);
+    }
+
+    // Cleanup old mini blocks (batched for performance)
+    // Only run cleanup every 10 blocks to reduce DOM thrashing
+    if (mC % 10 === 0 && mArea.children.length > MAX_MINI) {
+      const cleanupStart = performance.now();
+      const toRemove = mArea.children.length - MAX_MINI;
+
+      // Batch remove multiple blocks at once
+      for (let i = 0; i < toRemove; i++) {
+        const old = mArea.lastChild;
+
+        // Use cached references instead of querySelectorAll
+        const txElements = old.getElementsByClassName('tx');
+        for (let j = 0; j < txElements.length; j++) {
+          const t = txElements[j];
+          const tid = t.dataset.txId;
+          if (txReg[tid]) {
+            txReg[tid].mEl = null;
+            if (!txReg[tid].eEl) delete txReg[tid];
+          }
+        }
+
+        mArea.removeChild(old);
+      }
+
+      const cleanupTime = performance.now() - cleanupStart;
+      if (cleanupTime > 5) {
+        console.log('[Perf] Mini cleanup took', cleanupTime.toFixed(1), 'ms, removed', toRemove, 'blocks');
+      }
+    }
+
+    // Performance: Batch stat card updates every 10 blocks
+    if (mC % 10 === 0) {
+      document.getElementById('sTx').textContent = txC.toLocaleString();
+    }
+  }
+
+  // ========== CREATE TX ELEMENT ==========
+  // ========== CREATE TX ELEMENT ==========
+  function mkTx(id, hash, side) {
+    const el = document.createElement('div');
+    el.className = 'tx';
+    el.dataset.txId = id;
+    el.dataset.side = side;
+
+    const hEl = document.createElement('span');
+    hEl.className = 'tx-hash';
+    hEl.textContent = hash;
+    el.appendChild(hEl);
+
+    // Event listeners moved to delegation on mArea/eArea
+    return el;
+  }
+
+  // ========== EVM BLOCK ==========
+  function addEvm(blockNum, evmTimeStr) {
+    if (paused) return;
+    eC++;
+
+    if (curEvm) sealEvm(curEvm);
+
+    const blk = document.createElement('div');
+    blk.className = 'e-block building';
+
+    const top = document.createElement('div');
+    top.className = 'e-block-top';
+
+    const bid = document.createElement('span');
+    bid.className = 'bid';
+    bid.textContent = '#' + blockNum.toLocaleString();
+    top.appendChild(bid);
+
+    const st = document.createElement('span');
+    st.className = 'e-status';
+    st.textContent = '[ building... ]';
+    top.appendChild(st);
+
+    blk.appendChild(top);
+
+    const txs = document.createElement('div');
+    txs.className = 'txs';
+    blk.appendChild(txs);
+
+    const bw = document.createElement('div');
+    bw.className = 'bar-wrap';
+    const bf = document.createElement('div');
+    bf.className = 'bar-fill';
+    bw.appendChild(bf);
+    blk.appendChild(bw);
+
+    // Create the block data object BEFORE adding event listeners
+    const evmNum = blockNum;
+    const evmCreatedAt = new Date(); // TODO: Use actual block_timestamp from RPC data
+    const blockData = { el: blk, txs, st, bf, ids: [], num: evmNum, success: 0, failed: 0, totalGas: 0, visibleTxCount: 0, totalTxCount: 0, overflowEl: null, hiddenIds: [], expanded: false, evmTimeStr: evmTimeStr || '1s' };
+
+    // Store block data reference on the element
+    blk._blockData = blockData;
+
+    // Add block hover listeners (exclude TX, overflow, collapse)
+    blk.addEventListener('mouseover', (e) => {
+      if (!e.target.closest('.tx') && !e.target.closest('.tx-overflow') && !e.target.closest('.tx-collapse')) {
+        const data = blockData;
+        const gasInMGas = (data.totalGas / 1000000).toFixed(2) + 'M';
+        console.log('[EVM Block Hover] Block', evmNum, 'success:', data.success, 'failed:', data.failed, 'gas:', gasInMGas);
+        onBlockHover({
+          num: '#' + evmNum.toLocaleString(),
+          success: data.success,
+          failed: data.failed,
+          gas: gasInMGas,
+          timestamp: evmCreatedAt
+        }, e);
+      }
+    });
+    blk.addEventListener('mousemove', (e) => {
+      if (!e.target.closest('.tx') && !e.target.closest('.tx-overflow') && !e.target.closest('.tx-collapse')) {
+        moveTooltip(e);
+      }
+    });
+    blk.addEventListener('mouseleave', () => hideTooltip());
+
+    eArea.prepend(blk);
+    if (eScrolledAway) {
+      // Use fixed estimate instead of reading offsetHeight (forces reflow!)
+      eScrollAccumulated += 140; // Fixed estimate: ~140px per EVM block
+      eArea.scrollTop += eScrollAccumulated;
+      eScrollAccumulated = 0;
+    }
+
+    curEvm = blockData;
+    evmBlocks.push(curEvm);
+
+    // Update EVM block counter
+    currentEvmBlockNumber = evmNum;
+    evmBlockCount++;
+    document.getElementById('sEvm').textContent = evmBlockCount.toLocaleString();
+
+    eProg = 0;
+
+    while (eArea.children.length > MAX_EVM) {
+      const old = eArea.lastChild;
+      // Performance: Use getElementsByClassName instead of querySelectorAll
+      const txElements = old.getElementsByClassName('tx');
+      for (let i = 0; i < txElements.length; i++) {
+        const t = txElements[i];
+        const tid = t.dataset.txId;
+        if (txReg[tid]) txReg[tid].eEl = null;
+        if (txReg[tid] && !txReg[tid].mEl && !txReg[tid].eEl) delete txReg[tid];
+      }
+      eArea.removeChild(old);
+      const idx = evmBlocks.findIndex(eb => eb.el === old);
+      if (idx !== -1) evmBlocks.splice(idx, 1);
+    }
+  }
+
+  function sealEvm(eb) {
+    eb.el.classList.remove('building');
+    eb.el.classList.add('sealed');
+    eb.st.textContent = `[ confirmed · ${eb.evmTimeStr} ]`;
+    eb.bf.style.width = '100%';
+    eb.ids.forEach(id => {
+      if (txReg[id] && txReg[id].eEl) txReg[id].eEl.classList.add('confirmed-evm');
+    });
+  }
+
+  function tickEvm() {
+    if (paused || !curEvm) return;
+    eProg += 2;
+    if (eProg > 100) eProg = 100;
+    curEvm.bf.style.width = eProg + '%';
+  }
+
+  // ========== TOOLTIPS ==========
+  // ========== TOOLTIPS ==========
+  let tooltipLocked = false;
+  let tooltipHideTimer = null;
+
+  function showTooltip(html, e) {
+    if (tooltipHideTimer) {
+      clearTimeout(tooltipHideTimer);
+      tooltipHideTimer = null;
+    }
+    tooltip.innerHTML = html;
+    tooltip.classList.add('show');
+
+    // Anchor tooltip to the hovered element, not the mouse cursor
+    const target = e.target.closest('.tx') || e.target.closest('.e-block-top') || e.target.closest('.m-block-top') || e.target;
+    const rect = target.getBoundingClientRect();
+    const tw = 220;
+    const th = tooltip.offsetHeight || 180;
+
+    // Try to position to the right of the element
+    let x = rect.right + 10;
+    let y = rect.top;
+
+    // If it would overflow right, position to the left
+    if (x + tw > window.innerWidth - 10) {
+      x = rect.left - tw - 10;
+    }
+    // If still overflows left, fallback to mouse position
+    if (x < 10) {
+      x = e.clientX + 10;
+    }
+    // Prevent overflow at bottom
+    if (y + th > window.innerHeight - 10) {
+      y = window.innerHeight - th - 10;
+    }
+    // Prevent overflow at top
+    if (y < 10) y = 10;
+
+    tooltip.style.left = x + 'px';
+    tooltip.style.top = y + 'px';
+    tooltipLocked = true;
+  }
+
+  function moveTooltip(e) {
+    if (tooltipLocked) return;
+  }
+
+  function hideTooltip() {
+    tooltipHideTimer = setTimeout(() => {
+      if (!tooltip.matches(':hover')) {
+        tooltip.classList.remove('show');
+        tooltipLocked = false;
+      }
+    }, 200);
+  }
+
+  tooltip.addEventListener('mouseenter', () => {
+    if (tooltipHideTimer) {
+      clearTimeout(tooltipHideTimer);
+      tooltipHideTimer = null;
+    }
+  });
+
+  tooltip.addEventListener('mouseleave', () => {
+    tooltip.classList.remove('show');
+    tooltipLocked = false;
+    offHover();
+    setTimeout(() => {
+      if (!grid.matches(':hover') && !tooltip.matches(':hover')) {
+        paused = false;
+        pauseBar.classList.remove('show');
+        // Auto-collapse any expanded block when leaving
+        eArea.classList.remove('has-expanded');
+        const expandedBlock = eArea.querySelector('.e-block.expanded');
+        if (expandedBlock) {
+          expandedBlock.classList.remove('expanded');
+          const colBtn = expandedBlock.querySelector('.tx-collapse');
+          if (colBtn) colBtn.remove();
+        }
+        // Auto-scroll back to top to show live stream
+        mArea.scrollTop = 0;
+        eArea.scrollTop = 0;
+        mScrolledAway = false;
+        eScrolledAway = false;
+      }
+    }, 50);
+  });
+
+  function onTxHover(id, e) {
+    const tx = txReg[id];
+    if (!tx) return;
+
+    // Performance: Only highlight matching pair, no dimming
+    offHover();
+    if (tx.mEl) {
+      tx.mEl.classList.add('highlighted');
+      currentHighlighted.push(tx.mEl);
+    }
+    if (tx.eEl) {
+      tx.eEl.classList.add('highlighted');
+      currentHighlighted.push(tx.eEl);
+    }
+
+    const sc = tx.meta && tx.meta.status === 'success' ? 'success' : 'fail';
+    const explorerUrl = EXPLORER + tx.fullHash;
+    showTooltip(`
+      <div class="tt-title">${tx.hash}</div>
+      <div class="tt-row"><span class="tt-label">From</span><span class="tt-val">${tx.meta ? labelAddress(tx.meta.from) : 'N/A'}</span></div>
+      <div class="tt-row"><span class="tt-label">To</span><span class="tt-val">${tx.meta ? labelAddress(tx.meta.to) : 'N/A'}</span></div>
+      <div class="tt-row"><span class="tt-label">Type</span><span class="tt-val">${tx.meta ? tx.meta.type : 'N/A'}</span></div>
+      <div class="tt-row"><span class="tt-label">Gas Used</span><span class="tt-val">${tx.meta ? tx.meta.gas : 'N/A'}</span></div>
+      <div class="tt-row"><span class="tt-label">Status</span><span class="tt-val ${sc}">${tx.meta ? tx.meta.status : 'pending'}</span></div>
+      <div class="tt-hint"><a href="${explorerUrl}" target="_blank" rel="noopener">view on explorer →</a></div>
+    `, e);
+  }
+
+  function onTxClick(id, side) {
+    const tx = txReg[id];
+    if (!tx) {
+      console.log('[TX Click] Transaction not found:', id);
+      return;
+    }
+
+    // Auto-collapse any expanded EVM block first
+    const expandedBlock = eArea.querySelector('.e-block.expanded');
+    if (expandedBlock) {
+      expandedBlock.classList.remove('expanded');
+      eArea.classList.remove('has-expanded');
+      const colBtn = expandedBlock.querySelector('.tx-collapse');
+      if (colBtn) colBtn.remove();
+    }
+
+    let targetEl = side === 'mini' ? tx.eEl : tx.mEl;
+
+    // If clicking from mini side and eEl is not in the DOM (hidden in +more),
+    // find which EVM block has this TX and expand it
+    if (side === 'mini' && (!targetEl || !targetEl.isConnected)) {
+      const eb = evmBlocks.find(b => b.hiddenIds.includes(String(id)));
+      if (eb) {
+        expandEvmBlock(eb);
+        targetEl = tx.eEl;
+      }
+    }
+
+    if (!targetEl || !targetEl.isConnected) {
+      console.log('[TX Click] Target element not found. Side:', side, 'Has eEl:', !!tx.eEl, 'Has mEl:', !!tx.mEl);
+      return;
+    }
+
+    // Find the scrollable container (.block-area)
+    const container = side === 'mini' ? eArea : mArea;
+
+    // Calculate scroll position to center the element
+    const containerRect = container.getBoundingClientRect();
+    const targetRect = targetEl.getBoundingClientRect();
+    const scrollTop = container.scrollTop + (targetRect.top - containerRect.top) - (containerRect.height / 2) + (targetRect.height / 2);
+
+    // Smooth scroll the container
+    container.scrollTo({ top: scrollTop, behavior: 'smooth' });
+
+    // Highlight and flash
+    targetEl.classList.add('highlighted', 'flash-match');
+    setTimeout(() => {
+      targetEl.classList.remove('flash-match');
+    }, 600);
+
+    console.log('[TX Click] Scrolled to transaction on', side === 'mini' ? 'EVM' : 'mini', 'side');
+  }
+
+  function offHover() {
+    // Performance: Use tracked arrays instead of querySelectorAll
+    for (const el of currentHighlighted) el.classList.remove('highlighted');
+    for (const el of currentDimmed) el.classList.remove('dimmed');
+    currentHighlighted = [];
+    currentDimmed = [];
+    hideTooltip();
+  }
+
+  function onBlockHover(block, e) {
+    console.log('[onBlockHover] Called with:', block.num, 'timestamp:', block.timestamp);
+    const total = block.success + block.failed;
+    const ts = block.timestamp || new Date();
+    const timeStr = ts.toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    }) + '.' + String(ts.getMilliseconds()).padStart(3, '0');
+
+    showTooltip(`
+      <div class="tt-title">Block ${block.num}</div>
+      <div class="tt-row"><span class="tt-label">Timestamp</span><span class="tt-val">${timeStr}</span></div>
+      <div class="tt-row"><span class="tt-label">Total TXs</span><span class="tt-val">${total}</span></div>
+      <div class="tt-row"><span class="tt-label">Success</span><span class="tt-val success">${block.success}</span></div>
+      <div class="tt-row"><span class="tt-label">Failed</span><span class="tt-val fail">${block.failed}</span></div>
+      <div class="tt-row"><span class="tt-label">Gas Used</span><span class="tt-val">${block.gas}</span></div>
+    `, e);
+  }
+
+  // ========== EXPAND/COLLAPSE EVM BLOCKS ==========
+  function expandEvmBlock(eb) {
+    console.log('[Expand] Block:', eb.num, 'Hidden TXs:', eb.hiddenIds.length);
+    eb.expanded = true;
+    eb.el.classList.add('expanded');
+    eArea.classList.add('has-expanded');
+    console.log('[Expand] Added .expanded class. Has class:', eb.el.classList.contains('expanded'));
+
+    // Remove the +more badge from eb.el
+    if (eb.overflowEl && eb.overflowEl.parentElement) {
+      eb.overflowEl.parentElement.removeChild(eb.overflowEl);
+      eb.overflowEl = null;
+    }
+
+    // Re-render all hidden TXs into txs container
+    const hiddenCopy = [...eb.hiddenIds];
+    console.log('[Expand] Hidden IDs to add:', hiddenCopy);
+    let addedCount = 0;
+    hiddenCopy.forEach((hid, i) => {
+      const tx = txReg[hid];
+      console.log(`[Expand] Hidden[${i}]: id=${hid}, txReg has it: ${!!tx}, hash: ${tx?.hash}`);
+      if (tx) {
+        const el = mkTx(hid, tx.hash, 'evm');
+        tx.eEl = el;
+        eb.txs.appendChild(el);
+        addedCount++;
+        console.log(`[Expand] Added TX ${hid} to DOM. .txs children now: ${eb.txs.children.length}`);
+      }
+    });
+    console.log(`[Expand] Loop done. Added ${addedCount} of ${hiddenCopy.length} hidden TXs`);
+    console.log('[Expand] Total .tx elements in .txs:', eb.txs.querySelectorAll('.tx').length);
+    console.log('[Expand] .txs computed overflow:', window.getComputedStyle(eb.txs).overflow);
+    console.log('[Expand] .txs computed max-height:', window.getComputedStyle(eb.txs).maxHeight);
+    console.log('[Expand] .e-block computed overflow:', window.getComputedStyle(eb.el).overflow);
+
+    // Add collapse button to eb.el (before bar-wrap)
+    const col = document.createElement('span');
+    col.className = 'tx-collapse';
+    col.textContent = '↑ collapse';
+    col.addEventListener('click', (e) => {
+      e.stopPropagation();
+      collapseEvmBlock(eb);
+    });
+    const barWrap = eb.el.querySelector('.bar-wrap');
+    if (barWrap) {
+      eb.el.insertBefore(col, barWrap);
+    } else {
+      eb.el.appendChild(col);
+    }
+    eb.collapseEl = col;
+    console.log('[Expand] Collapse button added');
+  }
+
+  function collapseEvmBlock(eb) {
+    eb.expanded = false;
+    eb.el.classList.remove('expanded');
+    eArea.classList.remove('has-expanded');
+
+    // Remove collapse button from eb.el
+    if (eb.collapseEl && eb.collapseEl.parentElement) {
+      eb.collapseEl.parentElement.removeChild(eb.collapseEl);
+      eb.collapseEl = null;
+    }
+
+    // Clear all TX pills from txs
+    while (eb.txs.firstChild) eb.txs.removeChild(eb.txs.firstChild);
+
+    eb.hiddenIds = [];
+    eb.visibleTxCount = 0;
+
+    // Get the latest EVM_TX_CAP ids (newest first)
+    const allIds = [...eb.ids].reverse();
+    const showIds = allIds.slice(0, EVM_TX_CAP);
+    const hideIds = allIds.slice(EVM_TX_CAP);
+
+    showIds.forEach(id => {
+      const tx = txReg[id];
+      if (tx) {
+        const el = mkTx(id, tx.hash, 'evm');
+        tx.eEl = el;
+        eb.txs.appendChild(el);
+        eb.visibleTxCount++;
+      }
+    });
+
+    eb.hiddenIds = hideIds.reverse();
+
+    if (hideIds.length > 0) {
+      const ov = document.createElement('span');
+      ov.className = 'tx-overflow';
+      ov.textContent = '+' + hideIds.length + ' more';
+      ov.addEventListener('click', (e) => {
+        e.stopPropagation();
+        expandEvmBlock(eb);
+      });
+      const barWrap = eb.el.querySelector('.bar-wrap');
+      if (barWrap) {
+        eb.el.insertBefore(ov, barWrap);
+      } else {
+        eb.el.appendChild(ov);
+      }
+      eb.overflowEl = ov;
+    }
+  }
+
+  // ========== PAUSE LOGIC ==========
+  const grid = document.querySelector('.grid');
+  grid.addEventListener('mouseenter', () => { paused = true; pauseBar.classList.add('show'); });
+  grid.addEventListener('mouseleave', () => {
+    setTimeout(() => {
+      if (!tooltip.matches(':hover') && !grid.matches(':hover')) {
+        paused = false;
+        pauseBar.classList.remove('show');
+        offHover();
+        // Auto-collapse any expanded block when leaving
+        eArea.classList.remove('has-expanded');
+        const expandedBlock = eArea.querySelector('.e-block.expanded');
+        if (expandedBlock) {
+          expandedBlock.classList.remove('expanded');
+          const colBtn = expandedBlock.querySelector('.tx-collapse');
+          if (colBtn) colBtn.remove();
+        }
+        // Auto-scroll back to top to show live stream
+        mArea.scrollTop = 0;
+        eArea.scrollTop = 0;
+        mScrolledAway = false;
+        eScrolledAway = false;
+      }
+    }, 50);
+  });
+
+  tooltip.addEventListener('mouseenter', () => {
+    paused = true;
+    pauseBar.classList.add('show');
+  });
+
+  // TPS calculation
+  function updateTps() {
+    if (paused) return; // Freeze TPS when paused
+
+    const now = Date.now();
+    const beforeCount = tpsWindow.length;
+    tpsWindow = tpsWindow.filter(t => now - t < 1000);
+    const tps = tpsWindow.length;
+    document.getElementById('sTps').textContent = tps;
+
+    // Debug logging (comment out if not needed)
+    if (tps > 0 && Math.random() < 0.05) {  // Log ~5% of the time to avoid spam
+      console.log('[TPS Debug] Window: last 1000ms | Total TXs:', beforeCount, '→ In window:', tps, '| TPS:', tps);
+    }
+  }
+
+  // Gas rate calculation (MGAS/s)
+  function updateGasRate() {
+    if (paused) return; // Freeze gas rate when paused
+
+    const now = Date.now();
+    gasWindow = gasWindow.filter(g => now - g.timestamp < 1000);
+    const totalGasInWindow = gasWindow.reduce((sum, g) => sum + g.gas, 0);
+    const mgasPerSec = (totalGasInWindow / 1000000).toFixed(1);
+    document.getElementById('sGas').textContent = mgasPerSec + ' MGAS/s';
+  }
+
+  // Block time calculation (updates every 200ms with real data for live updates)
+  let lastDisplayedMini = null;
+  let lastDisplayedEvm = null;
+
+  function updateBlockTimes() {
+    // Update mini block time (show 1 decimal for precision)
+    if (miniBlockTimes.length > 0) {
+      const avgMiniTime = miniBlockTimes.reduce((a, b) => a + b, 0) / miniBlockTimes.length;
+      const displayValue = `${avgMiniTime.toFixed(1)}ms`;
+
+      if (displayValue !== lastDisplayedMini) {
+        document.getElementById('miniTime').textContent = displayValue;
+        console.log(`[Display Update] Mini block time: ${displayValue} (from ${miniBlockTimes.length} samples)`);
+        lastDisplayedMini = displayValue;
+      }
+    }
+
+    // Update EVM block time
+    if (evmBlockTimes.length > 0) {
+      const avgEvmTime = evmBlockTimes.reduce((a, b) => a + b, 0) / evmBlockTimes.length;
+      const evmSeconds = (avgEvmTime / 1000).toFixed(2);
+      const displayValue = `${evmSeconds}s`;
+
+      if (displayValue !== lastDisplayedEvm) {
+        document.getElementById('evmTime').textContent = displayValue;
+        console.log(`[Display Update] EVM block time: ${displayValue} (from ${evmBlockTimes.length} samples, raw avg: ${avgEvmTime.toFixed(1)}ms)`);
+        lastDisplayedEvm = displayValue;
+      }
+    } else {
+      // If no samples yet, show default
+      const defaultDisplay = '1.00s';
+      if (defaultDisplay !== lastDisplayedEvm) {
+        document.getElementById('evmTime').textContent = defaultDisplay;
+        console.log('[Display Update] EVM block time: ' + defaultDisplay + ' (no samples yet)');
+        lastDisplayedEvm = defaultDisplay;
+      }
+    }
+  }
+
+  setInterval(updateTps, 200);
+  setInterval(updateGasRate, 200);
+  setInterval(updateBlockTimes, 200); // Update block times every 200ms for live updates
+  setInterval(tickEvm, 50);
+
+  // Memory monitoring
+  setInterval(() => {
+    const txRegSize = Object.keys(txReg).length;
+    const miniBlockCount = mArea.children.length;
+    const evmBlockCount = eArea.children.length;
+    console.log('[Mem] txReg:', txRegSize, '| Mini blocks:', miniBlockCount, '| EVM blocks:', evmBlockCount);
+  }, 10000); // Every 10 seconds
+
+  // ========== START ==========
+  connectWebSocket();
+</script>
+
+</body>
+</html>
